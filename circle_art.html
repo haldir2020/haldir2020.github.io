@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <title>Circle Art</title>
+        <link rel="stylesheet" href="styles.css">
+        <style>
+            #interactive {
+                display: block;
+                margin-left: auto;
+                margin-right: auto;
+                width: 80vh;
+                height: 80vh;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="navbar">
+            <a href=index.html>Home</a>
+            <a href="circle_art.html">Circle Art</a>
+        </div>
+
+        <div class="main">
+            <p> Hover over the circles below to make an image appear. </p>
+        </div>
+        <canvas id="interactive" width="128" height="128"></canvas>
+    <script type="text/javascript">
+    	//Loosely based on the concept for http://www.koalastothemax.com/
+        var scalingFactor = 4 //Higher scaling factor gives better resolution, also the diameter of smallest possible circles (should be 2^n, where n >= 0)
+    	var canv = document.getElementById('interactive');
+        canv.width = 128*scalingFactor; //Default 128, since the completed image is 128x128 circles
+        canv.height = 128*scalingFactor; //Keep canvas square
+        var now = new Date();
+        var weekNumber = getWeek(now);
+        console.log('Getting image for week '+ weekNumber.toString()+'.'); //A new image each week
+        beginInteractive(canv, './images/week'+weekNumber.toString()+'.jpg', scalingFactor/2);
+
+        //MAIN CODE     
+        function beginInteractive(canvas, imageSource, minCircleRadius) {
+            context = canvas.getContext('2d');
+            var imageObj = new Image();
+            imageObj.crossOrigin = 'anonymous';
+            imageObj.onload = function() {
+                context.drawImage(imageObj, 0, 0, canvas.width, canvas.height);
+                const imageData = context.getImageData(0, 0, canvas.width, canvas.height); //Extract image data
+                console.log('Image data comprises '+(imageData.data.length/4).toString()+' pixels.'); //Print data size
+                circles = [new Circle(canvas.width/2, canvas.height/2, canvas.height/2, imageData.data, canvas.width)]; //Initiate the first circle in center
+                context.clearRect(0, 0, canvas.width, canvas.height);
+                drawCircles(context, circles); //Draw the first circle;
+                
+                //Begin listening for mouse movements
+                canvas.addEventListener('mousemove', function(evt) {
+                    var mousePos = getMousePos(canvas, evt);
+                    for (var i=0; i<circles.length; i++){
+                        //Spawn new circles if mouse is over a circle and circular is larger than minimum size.
+                        if (Math.pow(mousePos.x-circles[i].x,2)+Math.pow(mousePos.y-circles[i].y,2) < Math.pow(circles[i].radius,2) && circles[i].radius > minCircleRadius) { 
+                            circles = spawnCircles(context, circles, i, imageData.data, canvas.width);
+                        }
+                    }
+                    if (circles.length == 16384) {
+                        console.log('The image has been completely rendered.');
+                    }
+                }, false);
+            };
+            imageObj.src = imageSource;
+        };
+
+        function getMousePos(canvas, evt) {
+            var rect = canvas.getBoundingClientRect(); //Get bounds of canvas
+            return {
+              x: (evt.clientX-rect.left)*canvas.width/(rect.right-rect.left), //Convert to position in inner canvas coordinates
+              y: (evt.clientY-rect.top)*canvas.height/(rect.bottom-rect.top)
+            };
+        };
+
+        //CODE FOR CIRCLE OBJECTS
+        function Circle(x, y, radius, colorData, rowWidth){ //Object type for every circle to create a 'pixel'
+        	this.x = x;
+        	this.y = y;
+        	this.radius = radius;
+        	var reds = 0.00; //Sort elements of data by color
+        	var greens = 0.00;
+        	var blues = 0.00;
+            for (var i=x-radius; i<x+radius; i++){
+                for (var j=y-radius; j<y+radius; j++){
+                    //RGBa values for a pixel (x,y) start at 4*(x+(row size)*y) in color data array
+                    reds += colorData[4*i+4*rowWidth*j+0]; 
+                    greens += colorData[4*i+4*rowWidth*j+1];
+                    blues += colorData[4*i+4*rowWidth*j+2];
+                    //...+3 is alpha (opacity)
+                    //...+4 is the next red data
+                }
+            };
+        	var n = Math.pow(2*radius,2); //Area of region in pixels
+        	this.color = [Math.round(reds/n), Math.round(greens/n), Math.round(blues/n)]; //Average color in the circle's region
+        };
+        function spawnCircles(context, circles, i, colorData, rowWidth){ //Removes a circle, adds four smaller circles
+            x = circles[i].x;
+        	y = circles[i].y;
+        	rad = circles[i].radius;
+        	newcircles = [
+        		new Circle(x+rad/2, y+rad/2, rad/2, colorData, rowWidth),
+        		new Circle(x-rad/2, y+rad/2, rad/2, colorData, rowWidth),
+        		new Circle(x-rad/2, y-rad/2, rad/2, colorData, rowWidth),
+        		new Circle(x+rad/2, y-rad/2, rad/2, colorData, rowWidth)
+        	];
+            context.clearRect(x-rad, y-rad, rad*2, rad*2); //Clear area and draw new circles
+            drawCircles(context, newcircles);
+            circles.splice(i,1)
+        	return(circles.concat(newcircles)); //Returns new array for circles
+        };
+        function drawCircles(context, circles){ //Draws circle objects after they have been created
+        	for (var i=0; i<circles.length; i++){
+        		context.beginPath();
+        		context.fillStyle = 'rgba('
+        			+circles[i].color[0].toString()+','
+        			+circles[i].color[1].toString()+','
+        			+circles[i].color[2].toString()+',1.0)';
+        		context.arc(circles[i].x, circles[i].y, circles[i].radius, 0, 2*Math.PI);
+        		context.fill();
+        	};
+        };
+
+        //WEEK NUMBER
+        //Sourced from: https://weeknumber.net/how-to/javascript
+        function getWeek(dateObj) {
+            var date = new Date(dateObj.getTime());
+            date.setHours(0, 0, 0, 0);
+            // Thursday in current week decides the year.
+            date.setDate(date.getDate() + 3 - (date.getDay() + 6) % 7);
+            // January 4 is always in week 1.
+            var week1 = new Date(date.getFullYear(), 0, 4);
+            // Adjust to Thursday in week 1 and count number of weeks from date to week1.
+            return 1 + Math.round(((date.getTime() - week1.getTime()) / 86400000
+                   - 3 + (week1.getDay() + 6) % 7) / 7);
+        }
+    </script>
+    </body>
+</html>

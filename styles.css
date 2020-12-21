@@ -1,0 +1,26 @@
+body {
+    background-color: rgb(200,200,200);
+    padding: 10px;
+}
+.main {
+    margin-top: 30px;
+}
+.navbar {
+    overflow: hidden;
+    background-color: rgb(140,140,160);
+    position: fixed;
+    top: 0;  /*Place the navbar at top of page */ 
+    width: 100%;
+}
+.navbar a {
+    float:left;
+    display: block;
+    color: rgb(100,30,30);
+    text-align: center;
+    padding: 14px 16px;
+    text-decoration: none;
+}
+.navbar a:hover {
+    background: rgb(200,200,200);
+    color: black;
+}
